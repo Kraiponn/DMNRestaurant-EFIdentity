@@ -1,0 +1,18 @@
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace DMNRestaurant.Models.DTO.Auth
+{
+    public class UserResetPasswordDTO
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; }
+
+        [Required]
+        [StringLength(16, MinimumLength = 6, ErrorMessage = "Password length must be between {0} and {1} characters")]
+        public string Password { get; set; }
+
+        [Required]
+        public string ResetToken { get; set; }
+    }
+}

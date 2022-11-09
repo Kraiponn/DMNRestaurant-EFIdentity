@@ -58,7 +58,7 @@ namespace DMNRestaurant.Services.Repository
                 }
 
                 await _userManager.AddToRoleAsync(user, ERoles.Member.ToString());
-                await _signinManager.SignInAsync(user, isPersistent: false);
+                //await _signinManager.SignInAsync(user, isPersistent: false);
             }
             else
             {
@@ -76,13 +76,13 @@ namespace DMNRestaurant.Services.Repository
          *                        Login to Access Data
          ***********************************************************************/
         public async Task<(int responseCode, List<string> messages, UserRolesDTO responseData)>
-            SigninAsync(string email, string password)
+            SigninAsync(LoginDTO loginDTO)
         {
             int responseCode = 1;
             var messages = new List<string>();
             var userRoles = new UserRolesDTO();
 
-            var user = await _userManager.FindByEmailAsync(email);
+            var user = await _userManager.FindByEmailAsync(loginDTO.Email);
             if (user == null)
             {
                 responseCode = 0;
@@ -90,33 +90,40 @@ namespace DMNRestaurant.Services.Repository
                 return (responseCode, messages, userRoles);
             }
 
-            var result = await _signinManager
-                .PasswordSignInAsync(user, password, false, false);
-            if (!result.Succeeded)
+            var result = await _signinManager.PasswordSignInAsync(
+                    loginDTO.Email,
+                    loginDTO.Password,
+                    false,
+                    false
+                );
+
+            if (result.Succeeded)
             {
-                responseCode = 0;
-                messages.Add("Invalid signin. Please try again");
+                var roles = await _userManager.GetRolesAsync(user);
+                var accessToken = _secureRepo.GenerateJwtToken(user, roles);
+
+                userRoles = new UserRolesDTO()
+                {
+                    Id = user.Id,
+                    FullName = user.FullName,
+                    UserName = user.Email,
+                    Email = user.Email,
+                    Address = user.Address,
+                    Photo = user.Photo,
+                    PhoneNumber = user.PhoneNumber,
+                    Roles = roles,
+                    AccessToken = accessToken
+                };
+
+                messages.Add("Signin is successfully");
                 return (responseCode, messages, userRoles);
             }
-
-            var roles = await _userManager.GetRolesAsync(user);
-            var accessToken = _secureRepo.GenerateJwtToken(user.Id, roles);
-
-            userRoles = new UserRolesDTO()
+            else
             {
-                Id = user.Id,
-                FullName = user.FullName,
-                UserName = user.Email,
-                Email = user.Email,
-                Address = user.Address,
-                Photo = user.Photo,
-                PhoneNumber = user.PhoneNumber,
-                Roles = roles,
-                AccessToken = accessToken
-            };
-
-            messages.Add("Signin is successfully");
-            return (responseCode, messages, userRoles);
+                responseCode = 0;
+                messages.Add("Password is incorrect. Please try again");
+                return (responseCode, messages, userRoles);
+            }
         }
 
         /************************************************************************
@@ -136,7 +143,16 @@ namespace DMNRestaurant.Services.Repository
             else
             {
                 var delResult = await _userManager.DeleteAsync(userExist);
-                if (!delResult.Succeeded)
+                if (delResult.Succeeded)
+                {
+                    if (userExist.Photo != "nopic.png")
+                    {
+                        _photoRepo.Remove(userExist.Photo);
+                    }
+
+                    messages.Add("Account deleted successfully");
+                }
+                else
                 {
                     responseCode = 0;
                     foreach (var item in delResult.Errors)
@@ -144,14 +160,8 @@ namespace DMNRestaurant.Services.Repository
                         messages.Add(item.Description);
                     }
                 }
-
-                if (userExist.Photo != "nopic.png")
-                {
-                    _photoRepo.Remove(userExist.Photo);
-                }
             }
 
-            messages.Add("Account deleted successfully");
             return (responseCode, messages);
         }
 
@@ -175,21 +185,15 @@ namespace DMNRestaurant.Services.Repository
             {
                 if (userExist.Photo != "nopic.png")
                 {
-                    this.logger.LogError("Photo not equal nopic.png", userExist.Photo);
                     _photoRepo.Remove(userExist.Photo);
                 }
 
                 var result = _photoRepo.Validation(file);
-                this.logger.LogError("Photo validate result:");
-                this.logger.LogError(result);
                 if (string.IsNullOrEmpty(result))
                 {
                     var imageName = await _photoRepo.Upload(file);
                     userExist.Photo = imageName;
-                    this.logger.LogError("Photo uploaded with", imageName);
                 }
-
-                this.logger.LogError("Photo upload loop");
             }
 
             userExist.FullName = userUpdateDTO.FullName;
@@ -266,6 +270,49 @@ namespace DMNRestaurant.Services.Repository
         }
 
         /************************************************************************
+         *                          Update Password
+         ***********************************************************************/
+        public Task<(int responseCode, List<string> messages, string resetToken)> UpdatePasswordAsync(User user, string resetToken, string newPassword)
+        {
+            throw new NotImplementedException();
+        }
+
+        /************************************************************************
+         *                          Forgot Password
+         ***********************************************************************/
+        public async Task<(int responseCode, List<string> message, string resetToken)> ForgotPasswordAsync(User user)
+        {
+            int responseCode = 1;
+            var messages = new List<string>();
+
+            var resetTokenCode = await _userManager.GeneratePasswordResetTokenAsync(user);
+            return (responseCode, messages, resetTokenCode);
+        }
+
+        /************************************************************************
+         *                          Reset Password
+         ***********************************************************************/
+        public async Task<(int responseCode, List<string> messages)> ResetPasswordAsync(User user, string resetToken, string newPassword)
+        {
+            int responseCode = 1;
+            var messages = new List<string>();
+
+            var result = await _userManager.ResetPasswordAsync(user, resetToken, newPassword);
+            if (!result.Succeeded)
+            {
+                responseCode = 0;
+                foreach (var item in result.Errors)
+                {
+                    messages.Add(item.Description);
+                }
+
+                return (responseCode, messages);
+            }
+
+            return (responseCode, messages);
+        }
+
+        /************************************************************************
          *                        Get Manay Accounts
          ***********************************************************************/
         public async Task<IEnumerable<User>> GetUsersAsync(Expression<Func<User, bool>>? filter = null, int page = 1, int pageSize = 10, bool tracked = true)
@@ -284,10 +331,9 @@ namespace DMNRestaurant.Services.Repository
         /************************************************************************
          *                       Check The User Exist
          ***********************************************************************/
-        public async Task<bool> UserExists(User user)
+        public async Task<User> UserExists(string email)
         {
-            var result = await _userManager.FindByEmailAsync(user.Email);
-            return result != null;
+            return await _userManager.FindByEmailAsync(email);
         }
     }
 }

@@ -30,11 +30,6 @@ namespace DMNRestaurant.Services.Repository
             return false;
         }
 
-        public Task<bool> ReplaceImage(string fileName)
-        {
-            throw new NotImplementedException();
-        }
-
         public async Task<string> Upload(IFormFile file)
         {
             var originFileName = Path.GetFileName(file.FileName);

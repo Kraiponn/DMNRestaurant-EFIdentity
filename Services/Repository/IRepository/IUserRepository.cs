@@ -14,13 +14,15 @@ namespace DMNRestaurant.Services.Repository.IRepository
             int pageSize = 10,
             bool tracked = true);
         Task<(int responseCode, List<string> messages, UserRolesDTO responseData)> GetSingleUserAsync(string userId);
-
         Task<(int responseCode, List<string> messages, UserRolesDTO responseData)> SignupAsync(User user, string password);
-        Task<(int responseCode, List<string> messages, UserRolesDTO responseData)> SigninAsync(string email, string password);
+        Task<(int responseCode, List<string> messages, UserRolesDTO responseData)> SigninAsync(LoginDTO loginDTO);
         Task<(int responseCode, List<string> messages)> UpdateAsync(string userId, UserUpdateDTO userUpdateDTO, IFormFile file);
+        Task<(int responseCode, List<string> messages, string resetToken)> UpdatePasswordAsync(User user, string resetToken, string newPassword);
+        Task<(int responseCode, List<string> message, string resetToken)> ForgotPasswordAsync(User user);
+        Task<(int responseCode, List<string> messages)> ResetPasswordAsync(User user, string resetToken, string newPassword);
         Task<(int responseCode, List<string> messages)> DeleteAsync(string userId);
 
-        Task<bool> UserExists(User user);
+        Task<User> UserExists(string email);
         Task<UserRolesDTO> GetUserRolesAsync(string email);
 
     }

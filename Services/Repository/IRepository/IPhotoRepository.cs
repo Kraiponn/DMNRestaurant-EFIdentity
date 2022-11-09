@@ -7,7 +7,6 @@
         public bool ValidateExtension(string fileName);
         public string? Validation(IFormFile file);
         public Task<string> Upload(IFormFile file);
-        public Task<bool> ReplaceImage(string fileName);
         public bool Remove(string fileName);
     }
 }

@@ -1,4 +1,6 @@
-﻿using DMNRestaurant.Services.Repository.IRepository;
+﻿using DMNRestaurant.Areas.Identity.Data;
+using DMNRestaurant.Helper.Enum;
+using DMNRestaurant.Services.Repository.IRepository;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -37,16 +39,18 @@ namespace DMNRestaurant.Services.Repository
             return true;
         }
 
-        public string GenerateJwtToken(string userId, IList<string> roles)
+        public string GenerateJwtToken(User user, IList<string> roles)
         {
             var claimes = new List<Claim> {
-                new Claim("userId", userId),
-                new Claim("role", "")
+                new Claim(EJwtAliasKey.user_id.ToString(), user.Id),
+                new Claim(EJwtAliasKey.email.ToString(), user.Email),
+                new Claim(EJwtAliasKey.roles.ToString(), String.Join(",", roles))
             };
 
             var tokenHandler = new JwtSecurityTokenHandler();
             var key = new SymmetricSecurityKey(
-                    Encoding.UTF8.GetBytes(_config.GetSection("SecuritySettings:SecretKey").Value)
+                    Encoding.UTF8.GetBytes(
+                        _config.GetSection("SecuritySettings:JwtSecretKey").Value)
                 );
 
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature);

@@ -1,29 +1,36 @@
 ﻿using AutoMapper;
 using DMNRestaurant.Areas.Identity.Data;
+using DMNRestaurant.Helper.Enum;
 using DMNRestaurant.Models.DTO;
 using DMNRestaurant.Models.DTO.Auth;
 using DMNRestaurant.Services;
 using DMNRestaurant.Services.Repository.IRepository;
-using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Data;
+using System.IdentityModel.Tokens.Jwt;
 using System.Linq.Expressions;
 
 namespace DMNRestaurant.Controllers
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class AccountsController : ControllerBase
     {
+        private readonly ILogger<AccountsController> _logger;
         private readonly IUserRepository _userRepo;
         private readonly IMapper _mapper;
-        private readonly UserManager<User> uManager;
 
-        public AccountsController(IUserRepository userRepo, IMapper mapper, UserManager<User> uManager)
+        public AccountsController(
+            ILogger<AccountsController> logger,
+            IUserRepository userRepo,
+            IMapper mapper)
         {
+            _logger = logger;
             _userRepo = userRepo;
             _mapper = mapper;
-            this.uManager = uManager;
         }
 
         /*********************************************************************************
@@ -32,6 +39,7 @@ namespace DMNRestaurant.Controllers
          * @Access          Private(Admin)
          ********************************************************************************/
         [HttpGet]
+        [AllowAnonymous]
         public async Task<IActionResult> GetUsers(string? searchKey = null, int page = 1, int pageSize = 10)
         {
             var respAPI = new ResponseAPI<IEnumerable<UserDTO>>();
@@ -47,6 +55,12 @@ namespace DMNRestaurant.Controllers
                     respAPI.IsSuccess = false;
                     respAPI.ErrorMessage = new List<string> { "Account Not Found" };
                     return NotFound(respAPI);
+                }
+
+                // Update full url to photo field
+                foreach (var user in response)
+                {
+                    //
                 }
 
                 respAPI.Data = _mapper.Map<IEnumerable<UserDTO>>(response);
@@ -66,15 +80,24 @@ namespace DMNRestaurant.Controllers
          * @Route           GET api/accounts/profile/{id}
          * @Access          Private(Owner Account)
          *******************************************************************/
-        [HttpGet("profile/{id}")]
-        public async Task<IActionResult> GetProfile(string id)
+        [HttpGet("profile")]
+        public async Task<IActionResult> GetProfile()
         {
             var respAPI = new ResponseAPI<UserRolesDTO>();
 
             try
             {
+                //string userId = User.Claims.First(c => c.Type == "userId").Value;
+                //if (User.Claims == null)
+                //{
+                //    return Unauthorized();
+                //}
+                var accessToken = await HttpContext.GetTokenAsync(EJwtAliasKey.access_token.ToString());
+                var payload = new JwtSecurityToken(accessToken);
+                var userId = payload.Claims.First(p => p.Type == EJwtAliasKey.user_id.ToString()).Value;
+
                 (int responseCode, List<string> messages, UserRolesDTO responseData) =
-                            await _userRepo.GetSingleUserAsync(id);
+                            await _userRepo.GetSingleUserAsync(userId);
 
                 if (responseCode == 0)
                 {
@@ -84,12 +107,15 @@ namespace DMNRestaurant.Controllers
                     return NotFound(respAPI);
                 }
 
+                // Update full url to photo field
+                responseData.Photo = $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}/images/{responseData.Photo}";
+
                 respAPI.Data = _mapper.Map<UserRolesDTO>(responseData);
                 return Ok(respAPI);
             }
             catch (Exception ex)
             {
-                respAPI.StatusCode = System.Net.HttpStatusCode.NotFound;
+                respAPI.StatusCode = System.Net.HttpStatusCode.BadRequest;
                 respAPI.IsSuccess = false;
                 respAPI.ErrorMessage = new List<string> { ex.Message };
                 return BadRequest(respAPI);
@@ -97,40 +123,51 @@ namespace DMNRestaurant.Controllers
         }
 
         /********************************************************************
-         * @Description     Register new a member
-         * @Route           POST api/memebers
-         * @Access          Private(Admin)
+         * @Description     Register new a account
+         * @Route           POST api/accounts/signup
+         * @Access          Public
          *******************************************************************/
         [HttpPost("singup")]
-        public async Task<ActionResult<ResponseAPI<List<string>>>> Signup([FromBody] UserCreateDTO userDTO)
+        [AllowAnonymous]
+        public async Task<ActionResult<ResponseAPI<List<string>>>> Signup(UserCreateDTO userCreateDTO)
         {
             var respAPI = new ResponseAPI<List<string>>();
-            User user = _mapper.Map<User>(userDTO);
 
             try
             {
-                if (await _userRepo.UserExists(user))
+                var userExists = await _userRepo.UserExists(userCreateDTO.Email);
+
+                if (userExists != null)
                 {
                     respAPI.IsSuccess = false;
                     respAPI.StatusCode = System.Net.HttpStatusCode.BadRequest;
                     respAPI.ErrorMessage = new List<string> { "An email already exists" };
                     return BadRequest(respAPI);
                 }
-
-                (int responseCode, List<string> messages, UserRolesDTO responseData) =
-                               await _userRepo.SignupAsync(user, userDTO.Password);
-
-                if (responseCode == 0)
+                else
                 {
-                    respAPI.IsSuccess = false;
-                    respAPI.StatusCode = System.Net.HttpStatusCode.BadRequest;
-                    respAPI.ErrorMessage = messages;
-                    return BadRequest(respAPI);
-                }
+                    //User user = _mapper.Map<User>(userCreateDTO);
+                    var user = new User
+                    {
+                        UserName = userCreateDTO.Email,
+                        Email = userCreateDTO.Email,
+                    };
 
-                respAPI.StatusCode = System.Net.HttpStatusCode.Created;
-                respAPI.Data = new List<string> { "New member created is successfully" };
-                return CreatedAtRoute("", respAPI);
+                    (int responseCode, List<string> messages, UserRolesDTO responseData) =
+                               await _userRepo.SignupAsync(user, userCreateDTO.Password);
+
+                    if (responseCode == 0)
+                    {
+                        respAPI.IsSuccess = false;
+                        respAPI.StatusCode = System.Net.HttpStatusCode.BadRequest;
+                        respAPI.ErrorMessage = messages;
+                        return BadRequest(respAPI);
+                    }
+
+                    respAPI.StatusCode = System.Net.HttpStatusCode.Created;
+                    respAPI.Data = new List<string> { "Register is successfully" };
+                    return Created("", respAPI);
+                }
             }
             catch (DBConcurrencyException errors)
             {
@@ -144,19 +181,36 @@ namespace DMNRestaurant.Controllers
         /********************************************************************
          * @Description     Login 
          * @Route           POST api/accounts/signin
-         * @Access          Private(Admin)
+         * @Access          Public
          *******************************************************************/
         [HttpPost("signin")]
-        public async Task<ActionResult> Login()
+        [AllowAnonymous]
+        public async Task<ActionResult> Login(LoginDTO loginDTO)
         {
+            var respAPI = new ResponseAPI<UserRolesDTO>();
+
             try
             {
-                //
-                return Ok();
+                (int responseCode, List<string> messages, UserRolesDTO responseData) =
+                        await _userRepo.SigninAsync(loginDTO);
+
+                if (responseCode == 0)
+                {
+                    respAPI.IsSuccess = false;
+                    respAPI.StatusCode = System.Net.HttpStatusCode.BadRequest;
+                    respAPI.ErrorMessage = messages;
+                    return BadRequest(respAPI);
+                }
+
+                respAPI.Data = responseData;
+                return Ok(respAPI);
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                return BadRequest();
+                respAPI.IsSuccess = false;
+                respAPI.StatusCode = System.Net.HttpStatusCode.BadRequest;
+                respAPI.ErrorMessage = new List<string> { ex.Message };
+                return BadRequest(respAPI);
             }
         }
 
@@ -176,7 +230,6 @@ namespace DMNRestaurant.Controllers
                 //var payload = new JwtSecurityToken(token);
                 //var userId = payload.Claims.First(p => p.Type == "userId").Value;
 
-                //var user = _mapper.Map<User>(dto);
                 (int responseCode, List<string> messages) =
                         await _userRepo.UpdateAsync(id, updateDTO, file);
 
@@ -218,6 +271,7 @@ namespace DMNRestaurant.Controllers
                 if (responseCode == 0)
                 {
                     responseApi.IsSuccess = false;
+                    responseApi.StatusCode = System.Net.HttpStatusCode.BadRequest;
                     responseApi.ErrorMessage = messages;
                     return BadRequest(responseApi);
                 }
@@ -228,10 +282,103 @@ namespace DMNRestaurant.Controllers
             catch (Exception ex)
             {
                 responseApi.IsSuccess = false;
+                responseApi.StatusCode = System.Net.HttpStatusCode.BadRequest;
                 responseApi.ErrorMessage = new List<string>() { ex.Message };
                 return BadRequest(responseApi);
             }
-
         }
+
+        /********************************************************************
+         * @Description     Forgot password
+         * @Route           POST api/accounts/forgot-password
+         * @Access          Public
+         *******************************************************************/
+        [AllowAnonymous]
+        [HttpPost("forgot-password")]
+        public async Task<ActionResult<UserForgotPasswordResponseDTO>> ForgotPassword(UserForgotPasswordDTO dto)
+        {
+            var responseApi = new ResponseAPI<UserForgotPasswordResponseDTO>();
+
+            try
+            {
+                var user = await _userRepo.UserExists(dto.Email);
+                if (user == null)
+                {
+                    responseApi.IsSuccess = false;
+                    responseApi.StatusCode = System.Net.HttpStatusCode.NotFound;
+                    responseApi.ErrorMessage = new List<string> { "Account not found" };
+                    return NotFound(responseApi);
+                }
+
+                var result = await _userRepo.ForgotPasswordAsync(user);
+                if (result.responseCode == 0)
+                {
+                    responseApi.IsSuccess = false;
+                    responseApi.StatusCode = System.Net.HttpStatusCode.BadRequest;
+                    responseApi.ErrorMessage = result.message;
+                    return BadRequest(responseApi);
+                }
+
+                responseApi.Data = new UserForgotPasswordResponseDTO
+                {
+                    ResetToken = result.resetToken
+                };
+
+                return Ok(responseApi);
+            }
+            catch (Exception ex)
+            {
+                responseApi.IsSuccess = false;
+                responseApi.StatusCode = System.Net.HttpStatusCode.BadRequest;
+                responseApi.ErrorMessage = new List<string>() { ex.Message };
+                return BadRequest(responseApi);
+            }
+        }
+
+        /********************************************************************
+         * @Description     Reset password
+         * @Route           POST api/accounts/reset-password
+         * @Access          Public
+         *******************************************************************/
+        [AllowAnonymous]
+        [HttpPost("reset-password")]
+        public async Task<IActionResult> ResetPassword(UserResetPasswordDTO dto)
+        {
+            var responseApi = new ResponseAPI<HttpMessageResponseDTO>();
+
+            try
+            {
+                var user = await _userRepo.UserExists(dto.Email);
+                if (user == null)
+                {
+                    responseApi.IsSuccess = false;
+                    responseApi.StatusCode = System.Net.HttpStatusCode.NotFound;
+                    responseApi.ErrorMessage = new List<string> { "Account not found" };
+                    return NotFound(responseApi);
+                }
+
+                var result = await _userRepo.ResetPasswordAsync(
+                    user, dto.ResetToken, dto.Password);
+
+                if (result.responseCode == 0)
+                {
+                    responseApi.IsSuccess = false;
+                    responseApi.StatusCode = System.Net.HttpStatusCode.BadRequest;
+                    responseApi.ErrorMessage = result.messages;
+                    return BadRequest(responseApi);
+                }
+
+                responseApi.Data = new HttpMessageResponseDTO { Message = "Your password has been reset." };
+                return Ok(responseApi);
+            }
+            catch (Exception ex)
+            {
+                responseApi.IsSuccess = false;
+                responseApi.StatusCode = System.Net.HttpStatusCode.BadRequest;
+                responseApi.ErrorMessage = new List<string>() { ex.Message };
+                return BadRequest(responseApi);
+            }
+        }
+
     }
 }
