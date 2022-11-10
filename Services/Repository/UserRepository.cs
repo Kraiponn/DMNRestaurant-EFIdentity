@@ -272,9 +272,24 @@ namespace DMNRestaurant.Services.Repository
         /************************************************************************
          *                          Update Password
          ***********************************************************************/
-        public Task<(int responseCode, List<string> messages, string resetToken)> UpdatePasswordAsync(User user, string resetToken, string newPassword)
+        public async Task<(int responseCode, List<string> messages)> UpdatePasswordAsync(User user, string resetToken, string newPassword)
         {
-            throw new NotImplementedException();
+            int responseCode = 1;
+            var messages = new List<string>();
+
+            var result = await _userManager.ResetPasswordAsync(user, resetToken, newPassword);
+            if (!result.Succeeded)
+            {
+                responseCode = 0;
+                foreach (var item in result.Errors)
+                {
+                    messages.Add(item.Description);
+                }
+
+                return (responseCode, messages);
+            }
+
+            return (responseCode, messages);
         }
 
         /************************************************************************
