@@ -22,6 +22,7 @@ builder.Services.AddSingleton(securSettings);
 
 builder.Services.AddScoped<IPhotoRepository, PhotoRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IAdminRepository, AdminRepository>();
 builder.Services.AddScoped<ISecurityRepository, SecurityRepository>();
 
 builder.Services.AddDbContext<IdentityContext>(options =>

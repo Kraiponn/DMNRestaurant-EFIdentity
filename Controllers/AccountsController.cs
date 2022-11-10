@@ -39,10 +39,10 @@ namespace DMNRestaurant.Controllers
          * @Access          Private(Admin)
          ********************************************************************************/
         [HttpGet]
-        [AllowAnonymous]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetUsers(string? searchKey = null, int page = 1, int pageSize = 10)
         {
-            var respAPI = new ResponseAPI<IEnumerable<UserDTO>>();
+            var respAPI = new ResponseAPI<IEnumerable<UsersWithPaginationDTO>>();
             Expression<Func<User, bool>>? filter = !string.IsNullOrEmpty(searchKey)
                     ? (k => k.Email.StartsWith(searchKey))
                     : null;
@@ -63,7 +63,7 @@ namespace DMNRestaurant.Controllers
                     //
                 }
 
-                respAPI.Data = _mapper.Map<IEnumerable<UserDTO>>(response);
+                respAPI.Data = _mapper.Map<IEnumerable<UsersWithPaginationDTO>>(response);
                 return Ok(respAPI);
             }
             catch (Exception ex)
@@ -108,7 +108,7 @@ namespace DMNRestaurant.Controllers
                 }
 
                 // Update full url to photo field
-                responseData.Photo = $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}/images/{responseData.Photo}";
+                responseData.Photo = $"{HttpContext.Request.Scheme}://{HttpContext.Request.Host}/images/accounts/{responseData.Photo}";
 
                 respAPI.Data = _mapper.Map<UserRolesDTO>(responseData);
                 return Ok(respAPI);
