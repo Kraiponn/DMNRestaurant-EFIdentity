@@ -11,6 +11,15 @@ namespace DMNRestaurant.Helper
             CreateMap<User, UserDTO>().ReverseMap();
             CreateMap<User, UserCreateDTO>().ReverseMap();
             CreateMap<User, UserUpdateDTO>().ReverseMap();
+
+            //CreateMap<User, UserDTO>();
+            //CreateMap<UserDTO, User>();
+
+            //CreateMap<User, UserCreateDTO>();
+            //CreateMap<UserCreateDTO, User>();
+
+            //CreateMap<User, UserUpdateDTO>();
+            //CreateMap<UserUpdateDTO, User>();
         }
     }
 }

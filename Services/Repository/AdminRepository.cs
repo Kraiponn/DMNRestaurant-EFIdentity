@@ -11,22 +11,28 @@ namespace DMNRestaurant.Services.Repository
 {
     public class AdminRepository : IAdminRepository
     {
+        private readonly ILogger<AdminRepository> logger;
         private readonly IMapper _mapper;
         private readonly UserManager<User> _userManager;
         private readonly SignInManager<User> _signInManager;
         private readonly RoleManager<IdentityRole> _roleManager;
+        private readonly IPhotoRepository _photoRepository;
 
         public AdminRepository(
+                ILogger<AdminRepository> logger,
                 IMapper mapper,
                 UserManager<User> userManager,
                 SignInManager<User> signInManager,
-                RoleManager<IdentityRole> roleManager
+                RoleManager<IdentityRole> roleManager,
+                IPhotoRepository photoRepository
             )
         {
+            this.logger = logger;
             _mapper = mapper;
             _userManager = userManager;
             _signInManager = signInManager;
             _roleManager = roleManager;
+            _photoRepository = photoRepository;
         }
 
         /************************************************************************
@@ -61,7 +67,8 @@ namespace DMNRestaurant.Services.Repository
         /************************************************************************
          *                        Get a Single Account
          ***********************************************************************/
-        public async Task<(int statusCode, List<string> errMessage, UserRolesDTO userRolesDTO)> GetSingleUserAsync(string userId)
+        public async Task<(int statusCode, List<string> errMessage, UserRolesDTO userRolesDTO)>
+            GetSingleUserAsync(string userId)
         {
             int statusCode = 200;
             var errMessage = new List<string>();
@@ -130,7 +137,10 @@ namespace DMNRestaurant.Services.Repository
                 var usersDTO = new List<UserDTO>();
                 foreach (var item in users)
                 {
-                    item.Photo = $"{scheme}://{host}/images/accounts/{item.Photo}";
+                    item.Photo = item.Photo == "nopic.png"
+                        ? item.Photo
+                        : $"{scheme}://{host}/images/accounts/{item.Photo}";
+
                     usersDTO.Add(_mapper.Map<UserDTO>(item));
                 }
 
@@ -149,9 +159,54 @@ namespace DMNRestaurant.Services.Repository
         /************************************************************************
          *                        Update an Account
          ***********************************************************************/
-        public Task<(int statusCode, List<string> errMessage)> UpdateAsync(string userId, User user, IFormFile file)
+        public async Task<(int statusCode, List<string> errMessage)> UpdateAsync(string userId, UserUpdateDTO dto, IFormFile file)
         {
-            throw new NotImplementedException();
+            int statusCode = 200;
+            var errMessage = new List<string>();
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                statusCode = 404;
+                errMessage.Add("Account not found");
+                return (statusCode, errMessage);
+            }
+
+            // If user attached file for upload
+            if (_photoRepository.IsUpdaload(file))
+            {
+                var validResult = _photoRepository.Validation(file);
+                if (!String.IsNullOrEmpty(validResult))
+                {
+                    statusCode = 400;
+                    errMessage.Add(validResult);
+                    return (statusCode, errMessage);
+                }
+
+                if (user.Photo != "nopic.png")
+                    _photoRepository.Remove(user.Photo, "accounts");
+
+                var uploadResult = await _photoRepository.UploadAsync(file, "accounts");
+                user.Photo = uploadResult;
+            }
+
+            // Update new account
+            user.FullName = dto.FullName;
+            user.PhoneNumber = dto.PhoneNumber;
+            user.Address = dto.Address;
+
+            var result = await _userManager.UpdateAsync(user);
+
+            if (!result.Succeeded)
+            {
+                statusCode = 400;
+                foreach (var item in result.Errors)
+                {
+                    errMessage.Add(item.Description);
+                }
+            }
+
+            return (statusCode, errMessage);
         }
 
         /************************************************************************
@@ -169,15 +224,77 @@ namespace DMNRestaurant.Services.Repository
                 errMessage.AddRange(GetErrorMessages(result));
             }
 
+            if (user.Photo != "nopic.png")
+                _photoRepository.Remove(user.Photo, "accounts");
+
             return (statusCode, errMessage);
         }
 
         /************************************************************************
          *                           Update Password
          ***********************************************************************/
-        public Task<(int statusCode, List<string> errMessage)> UpdatePasswordAsync(string userId, AdminUpdatePasswordDTO dto)
+        public async Task<(int statusCode, List<string> errMessage)> UpdatePasswordAsync(string userId, AdminUpdatePasswordDTO dto)
         {
-            throw new NotImplementedException();
+            int statusCode = 200;
+            var errMessage = new List<string>();
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                statusCode = 404;
+                errMessage.Add("Account not found");
+                return (statusCode, errMessage);
+            }
+
+            var resetToken = await _userManager.GeneratePasswordResetTokenAsync(user);
+            var result = await _userManager.ResetPasswordAsync(user, resetToken, dto.Password);
+
+            if (!result.Succeeded)
+            {
+                statusCode = 400;
+                errMessage.Add("Invalid update password. Please try again");
+            }
+
+            return (statusCode, errMessage);
+        }
+
+        /************************************************************************
+         *                     Update New Roles To Account
+         ***********************************************************************/
+        public async Task<(int statusCode, List<string> errMessage)> UpdateRolesAsync(string userId, AdminUpdateRolesDTO dto)
+        {
+            int statusCode = 200;
+            var errMessage = new List<string>();
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                statusCode = 404;
+                errMessage.Add("Account not found");
+                return (statusCode, errMessage);
+            }
+
+            var rolesToRemove = await _userManager.GetRolesAsync(user);
+            // Remove old roles from db
+            foreach (var item in rolesToRemove)
+            {
+                await _userManager.RemoveFromRoleAsync(user, item);
+            }
+
+            string[] rolesToUpdate = dto.Roles.Split(","); // Member,Guest,Admin
+            // Add new role to db
+            foreach (var item in rolesToUpdate)
+            {
+                var result = await _userManager.AddToRoleAsync(user, item);
+                if (result.Succeeded)
+                {
+                    statusCode = 400;
+                    errMessage.Add("Invalid edit role");
+                    return (statusCode, errMessage);
+                }
+            }
+
+            return (statusCode, errMessage);
         }
 
         /************************************************************************

@@ -6,7 +6,7 @@
         public bool ValidateFileSize(long fileSize);
         public bool ValidateExtension(string fileName);
         public string? Validation(IFormFile file);
-        public Task<string> Upload(IFormFile file);
-        public bool Remove(string fileName);
+        public Task<string> UploadAsync(IFormFile file, string toPath);
+        public bool Remove(string fileName, string fromPath);
     }
 }

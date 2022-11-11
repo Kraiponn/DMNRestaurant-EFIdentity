@@ -147,7 +147,7 @@ namespace DMNRestaurant.Services.Repository
                 {
                     if (userExist.Photo != "nopic.png")
                     {
-                        _photoRepo.Remove(userExist.Photo);
+                        _photoRepo.Remove(userExist.Photo, "accounts");
                     }
 
                     messages.Add("Account deleted successfully");
@@ -185,13 +185,13 @@ namespace DMNRestaurant.Services.Repository
             {
                 if (userExist.Photo != "nopic.png")
                 {
-                    _photoRepo.Remove(userExist.Photo);
+                    _photoRepo.Remove(userExist.Photo, "accounts");
                 }
 
                 var result = _photoRepo.Validation(file);
                 if (string.IsNullOrEmpty(result))
                 {
-                    var imageName = await _photoRepo.Upload(file);
+                    var imageName = await _photoRepo.UploadAsync(file, "accounts");
                     userExist.Photo = imageName;
                 }
             }

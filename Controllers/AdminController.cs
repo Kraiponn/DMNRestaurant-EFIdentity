@@ -1,8 +1,10 @@
 ﻿using AutoMapper;
 using DMNRestaurant.Areas.Identity.Data;
+using DMNRestaurant.Models.DTO;
 using DMNRestaurant.Models.DTO.Auth;
 using DMNRestaurant.Services;
 using DMNRestaurant.Services.Repository.IRepository;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Linq.Expressions;
 
@@ -15,11 +17,13 @@ namespace DMNRestaurant.Controllers
     {
         private readonly IMapper _mapper;
         private readonly IAdminRepository _adminRepo;
+        private readonly UserManager<User> manager;
 
-        public AdminController(IMapper mapper, IAdminRepository adminRepo)
+        public AdminController(IMapper mapper, IAdminRepository adminRepo, UserManager<User> manager)
         {
             _mapper = mapper;
             _adminRepo = adminRepo;
+            this.manager = manager;
         }
 
         /****************************************************************************
@@ -103,6 +107,151 @@ namespace DMNRestaurant.Controllers
                 respAPI.ErrorMessage = new List<string> { ex.Message };
 
                 return BadRequest(respAPI);
+            }
+        }
+
+        /****************************************************************************
+         * @Description     Create a new member
+         * @Route           POST api/admin/mange-account/create
+         * @Access          Private(Admin Account)
+         ***************************************************************************/
+        [HttpPost("create")]
+        public async Task<ActionResult<ResponseAPI<HttpMessageResponseDTO>>> CreateUser(UserCreateDTO dTO)
+        {
+            var respAPI = new ResponseAPI<HttpMessageResponseDTO>();
+
+            try
+            {
+                var userExist = await _adminRepo.UserExistAsync(dTO.Email);
+                if (userExist != null)
+                {
+                    respAPI.StatusCode = System.Net.HttpStatusCode.NotFound;
+                    respAPI.IsSuccess = false;
+                    respAPI.ErrorMessage = new List<string> { "An email address already exists" };
+                    return Conflict(respAPI);
+                }
+
+                var user = _mapper.Map<User>(dTO);
+                var result = await _adminRepo.CreateAsync(user);
+
+                if (result.statusCode != 201)
+                {
+                    respAPI.StatusCode = System.Net.HttpStatusCode.BadRequest;
+                    respAPI.IsSuccess = false;
+                    respAPI.ErrorMessage = new List<string> { "Invalid create account" };
+                }
+                else
+                {
+                    respAPI.Data = new HttpMessageResponseDTO { Message = "Account created successfully" };
+                    respAPI.StatusCode = System.Net.HttpStatusCode.Created;
+                }
+
+
+                return Ok(respAPI);
+            }
+            catch (Exception ex)
+            {
+                respAPI.StatusCode = System.Net.HttpStatusCode.BadRequest;
+                respAPI.IsSuccess = false;
+                respAPI.ErrorMessage = new List<string> { ex.Message.ToString() };
+                return BadRequest(respAPI);
+            }
+        }
+
+        /****************************************************************************
+         * @Description     Update user
+         * @Route           PUT api/admin/mange-account/{userId}/account
+         * @Access          Private(Admin Account)
+         ***************************************************************************/
+        [HttpPut("{userId}/account")]
+        public async Task<IActionResult> UpdateUser(string userId, [FromForm] UserUpdateDTO dTO, IFormFile file)
+        {
+            var respAPI = new ResponseAPI<HttpMessageResponseDTO>();
+
+            try
+            {
+                var results = await _adminRepo.UpdateAsync(userId, dTO, file);
+
+                if (results.statusCode == 400)
+                {
+                    respAPI.StatusCode = System.Net.HttpStatusCode.BadRequest;
+                    respAPI.IsSuccess = false;
+                    respAPI.ErrorMessage = results.errMessage;
+                    return BadRequest(respAPI);
+                }
+                else if (results.statusCode == 404)
+                {
+                    respAPI.StatusCode = System.Net.HttpStatusCode.NotFound;
+                    respAPI.IsSuccess = false;
+                    respAPI.ErrorMessage = results.errMessage;
+                    return NotFound(respAPI);
+                }
+                else
+                {
+                    respAPI.Data = new HttpMessageResponseDTO { Message = "Account updated successfully" };
+                    return Ok(respAPI);
+                }
+            }
+            catch (Exception ex)
+            {
+                respAPI.StatusCode = System.Net.HttpStatusCode.BadRequest;
+                respAPI.IsSuccess = false;
+                respAPI.ErrorMessage = new List<string> { ex.Message.ToString() };
+                return BadRequest(respAPI);
+            }
+        }
+
+        /****************************************************************************
+         * @Description     Update password of user
+         * @Route           PUT api/admin/mange-account/{userId}/password
+         * @Access          Private(Admin Account)
+         ***************************************************************************/
+        [HttpPut("{userId}/password")]
+        public async Task<IActionResult> UpdatePassword(string userId, AdminUpdatePasswordDTO dTO)
+        {
+            try
+            {
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest();
+            }
+        }
+
+        /****************************************************************************
+         * @Description     Update roles of user
+         * @Route           PUT api/admin/mange-account/{userId}/roles
+         * @Access          Private(Admin Account)
+         ***************************************************************************/
+        [HttpPut("{userId}/roles")]
+        public async Task<IActionResult> UpdateRoles(string userId, AdminUpdateRolesDTO dTO)
+        {
+            try
+            {
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest();
+            }
+        }
+
+        /****************************************************************************
+         * @Description     Delete account by user id
+         * @Route           DELETE api/admin/mange-account/{userId}/delete
+         * @Access          Private(Admin Account)
+         ***************************************************************************/
+        [HttpDelete("{userId}/delete")]
+        public async Task<IActionResult> DeleteUser(string userId)
+        {
+            try
+            {
+                return Ok();
+            }
+            catch (Exception ex)
+            {
+                return BadRequest();
             }
         }
     }
