@@ -2,7 +2,7 @@
 {
     public interface IPhotoRepository
     {
-        public bool IsUpdaload(IFormFile file);
+        public bool IsUpdaload(IFormFile? file);
         public bool ValidateFileSize(long fileSize);
         public bool ValidateExtension(string fileName);
         public string? Validation(IFormFile file);

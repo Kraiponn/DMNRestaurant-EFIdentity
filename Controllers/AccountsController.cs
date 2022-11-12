@@ -10,11 +10,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Data;
 using System.IdentityModel.Tokens.Jwt;
-using System.Linq.Expressions;
 
 namespace DMNRestaurant.Controllers
 {
-    [Authorize]
+    [Authorize(Roles = "Member, Admin")]
     [Route("api/[controller]")]
     [ApiController]
     public class AccountsController : ControllerBase
@@ -33,55 +32,13 @@ namespace DMNRestaurant.Controllers
             _mapper = mapper;
         }
 
-        /*********************************************************************************
-         * @Description     Get many accounts
-         * @Route           GET api/accounts?page=[Number]&pageSize=[Number]&searchKey=[?]
-         * @Access          Private(Admin)
-         ********************************************************************************/
-        [HttpGet]
-        [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> GetUsers(string? searchKey = null, int page = 1, int pageSize = 10)
-        {
-            var respAPI = new ResponseAPI<IEnumerable<UsersWithPaginationDTO>>();
-            Expression<Func<User, bool>>? filter = !string.IsNullOrEmpty(searchKey)
-                    ? (k => k.Email.StartsWith(searchKey))
-                    : null;
-            try
-            {
-                var response = await _userRepo.GetUsersAsync(filter, page, pageSize, true);
-                if (response == null)
-                {
-                    respAPI.StatusCode = System.Net.HttpStatusCode.NotFound;
-                    respAPI.IsSuccess = false;
-                    respAPI.ErrorMessage = new List<string> { "Account Not Found" };
-                    return NotFound(respAPI);
-                }
-
-                // Update full url to photo field
-                foreach (var user in response)
-                {
-                    //
-                }
-
-                respAPI.Data = _mapper.Map<IEnumerable<UsersWithPaginationDTO>>(response);
-                return Ok(respAPI);
-            }
-            catch (Exception ex)
-            {
-                respAPI.StatusCode = System.Net.HttpStatusCode.NotFound;
-                respAPI.IsSuccess = false;
-                respAPI.ErrorMessage = new List<string> { ex.Message };
-                return BadRequest(respAPI);
-            }
-        }
-
         /********************************************************************
          * @Description     Get a profile
          * @Route           GET api/accounts/profile/{id}
          * @Access          Private(Owner Account)
          *******************************************************************/
         [HttpGet("profile")]
-        public async Task<IActionResult> GetProfile()
+        public async Task<ActionResult<ResponseAPI<UserRolesDTO>>> GetProfile()
         {
             var respAPI = new ResponseAPI<UserRolesDTO>();
 
@@ -185,7 +142,7 @@ namespace DMNRestaurant.Controllers
          *******************************************************************/
         [HttpPost("signin")]
         [AllowAnonymous]
-        public async Task<ActionResult> Login(LoginDTO loginDTO)
+        public async Task<ActionResult<ResponseAPI<UserRolesDTO>>> Login(LoginDTO loginDTO)
         {
             var respAPI = new ResponseAPI<UserRolesDTO>();
 
@@ -220,7 +177,7 @@ namespace DMNRestaurant.Controllers
          * @Access          Private(Owner account | Admin)
          *******************************************************************/
         [HttpPut("update-account/{id}")]
-        public async Task<ActionResult<ResponseAPI<List<string>>>> UpdateAccount(string id, [FromForm] UserUpdateDTO updateDTO, IFormFile file)
+        public async Task<ActionResult<ResponseAPI<List<string>>>> UpdateAccount(string id, [FromForm] UserUpdateDTO updateDTO, IFormFile? file)
         {
             var responseApi = new ResponseAPI<string>();
 
@@ -342,7 +299,7 @@ namespace DMNRestaurant.Controllers
          *******************************************************************/
         [AllowAnonymous]
         [HttpPost("reset-password")]
-        public async Task<IActionResult> ResetPassword(UserResetPasswordDTO dto)
+        public async Task<ActionResult<ResponseAPI<HttpMessageResponseDTO>>> ResetPassword(UserResetPasswordDTO dto)
         {
             var responseApi = new ResponseAPI<HttpMessageResponseDTO>();
 

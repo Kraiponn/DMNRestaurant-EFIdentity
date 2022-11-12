@@ -1,5 +1,4 @@
-﻿using AutoMapper;
-using DMNRestaurant.Areas.Identity.Data;
+﻿using DMNRestaurant.Areas.Identity.Data;
 using DMNRestaurant.Helper.Enum;
 using DMNRestaurant.Models.DTO.Auth;
 using DMNRestaurant.Services.Repository.IRepository;
@@ -12,7 +11,6 @@ namespace DMNRestaurant.Services.Repository
     public class UserRepository : IUserRepository
     {
         private readonly ILogger<UserRepository> logger;
-        private readonly IMapper _mapper;
         private readonly IPhotoRepository _photoRepo;
         private readonly ISecurityRepository _secureRepo;
         private readonly UserManager<User> _userManager;
@@ -21,7 +19,6 @@ namespace DMNRestaurant.Services.Repository
 
         public UserRepository(
                 ILogger<UserRepository> logger,
-                IMapper mapper,
                 IPhotoRepository photoRepo,
                 ISecurityRepository secureRepo,
                 UserManager<User> userManager,
@@ -29,7 +26,6 @@ namespace DMNRestaurant.Services.Repository
                 SignInManager<User> signinManager)
         {
             this.logger = logger;
-            _mapper = mapper;
             _photoRepo = photoRepo;
             _secureRepo = secureRepo;
             _userManager = userManager;
@@ -168,7 +164,7 @@ namespace DMNRestaurant.Services.Repository
         /************************************************************************
          *                        Editing an Account
          ***********************************************************************/
-        public async Task<(int responseCode, List<string> messages)> UpdateAsync(string userId, UserUpdateDTO userUpdateDTO, IFormFile file)
+        public async Task<(int responseCode, List<string> messages)> UpdateAsync(string userId, UserUpdateDTO userUpdateDTO, IFormFile? file)
         {
             int responseCode = 1;
             var messages = new List<string>();
@@ -181,7 +177,7 @@ namespace DMNRestaurant.Services.Repository
                 return (responseCode, messages);
             };
 
-            if (_photoRepo.IsUpdaload(file))
+            if (file != null && file.Length > 0)
             {
                 if (userExist.Photo != "nopic.png")
                 {

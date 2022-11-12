@@ -34,6 +34,7 @@ builder
     .AddRoles<IdentityRole>()
     .AddEntityFrameworkStores<IdentityContext>()
     .AddDefaultTokenProviders();
+
 builder.Services.Configure<IdentityOptions>(options =>
 {
     options.Password.RequiredLength = 3;
@@ -89,6 +90,14 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 var app = builder.Build();
+
+// Global cors policy
+app.UseCors(options => options
+    //.WithOrigins("https://example.com", "https://codemakerlab.com") // Allow some domain
+    .AllowAnyOrigin() // Allow all domain
+    .AllowAnyHeader()
+    .AllowAnyMethod()
+);
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

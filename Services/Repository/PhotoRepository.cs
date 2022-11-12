@@ -16,7 +16,7 @@ namespace DMNRestaurant.Services.Repository
         /************************************************************************
          *                        Check File Upload
          ***********************************************************************/
-        public bool IsUpdaload(IFormFile file) => file != null && file.Length > 0;
+        public bool IsUpdaload(IFormFile? file) => file != null && file.Length > 0;
 
         /************************************************************************
          *                      Validate Extension File

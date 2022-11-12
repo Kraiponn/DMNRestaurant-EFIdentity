@@ -4,26 +4,24 @@ using DMNRestaurant.Models.DTO;
 using DMNRestaurant.Models.DTO.Auth;
 using DMNRestaurant.Services;
 using DMNRestaurant.Services.Repository.IRepository;
-using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Linq.Expressions;
 
 namespace DMNRestaurant.Controllers
 {
-    //[Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin")]
     [Route("api/[controller]/manage-account")]
     [ApiController]
     public class AdminController : ControllerBase
     {
         private readonly IMapper _mapper;
         private readonly IAdminRepository _adminRepo;
-        private readonly UserManager<User> manager;
 
-        public AdminController(IMapper mapper, IAdminRepository adminRepo, UserManager<User> manager)
+        public AdminController(IMapper mapper, IAdminRepository adminRepo)
         {
             _mapper = mapper;
             _adminRepo = adminRepo;
-            this.manager = manager;
         }
 
         /****************************************************************************
@@ -85,7 +83,11 @@ namespace DMNRestaurant.Controllers
 
             try
             {
-                var result = await _adminRepo.GetSingleUserAsync(userId);
+                var result = await _adminRepo.GetSingleUserAsync(
+                    userId,
+                    Request.Scheme,
+                    Request.Host.ToString()
+                );
 
                 if (result.statusCode == 404)
                 {
@@ -164,7 +166,7 @@ namespace DMNRestaurant.Controllers
          * @Access          Private(Admin Account)
          ***************************************************************************/
         [HttpPut("{userId}/account")]
-        public async Task<IActionResult> UpdateUser(string userId, [FromForm] UserUpdateDTO dTO, IFormFile file)
+        public async Task<ActionResult<ResponseAPI<HttpMessageResponseDTO>>> UpdateUser(string userId, [FromForm] UserUpdateDTO dTO, IFormFile? file)
         {
             var respAPI = new ResponseAPI<HttpMessageResponseDTO>();
 
@@ -207,15 +209,40 @@ namespace DMNRestaurant.Controllers
          * @Access          Private(Admin Account)
          ***************************************************************************/
         [HttpPut("{userId}/password")]
-        public async Task<IActionResult> UpdatePassword(string userId, AdminUpdatePasswordDTO dTO)
+        public async Task<ActionResult<ResponseAPI<HttpMessageResponseDTO>>> UpdatePassword(string userId, AdminUpdatePasswordDTO dTO)
         {
+            var respAPI = new ResponseAPI<HttpMessageResponseDTO>();
+
             try
             {
-                return Ok();
+                var results = await _adminRepo.UpdatePasswordAsync(userId, dTO);
+
+                if (results.statusCode == 400)
+                {
+                    respAPI.StatusCode = System.Net.HttpStatusCode.BadRequest;
+                    respAPI.IsSuccess = false;
+                    respAPI.ErrorMessage = results.errMessage;
+                    return BadRequest(respAPI);
+                }
+                else if (results.statusCode == 404)
+                {
+                    respAPI.StatusCode = System.Net.HttpStatusCode.NotFound;
+                    respAPI.IsSuccess = false;
+                    respAPI.ErrorMessage = results.errMessage;
+                    return NotFound(respAPI);
+                }
+                else
+                {
+                    respAPI.Data = new HttpMessageResponseDTO { Message = "Password updated successfully" };
+                    return Ok(respAPI);
+                }
             }
             catch (Exception ex)
             {
-                return BadRequest();
+                respAPI.StatusCode = System.Net.HttpStatusCode.BadRequest;
+                respAPI.IsSuccess = false;
+                respAPI.ErrorMessage = new List<string> { ex.Message.ToString() };
+                return BadRequest(respAPI);
             }
         }
 
@@ -225,15 +252,40 @@ namespace DMNRestaurant.Controllers
          * @Access          Private(Admin Account)
          ***************************************************************************/
         [HttpPut("{userId}/roles")]
-        public async Task<IActionResult> UpdateRoles(string userId, AdminUpdateRolesDTO dTO)
+        public async Task<ActionResult<ResponseAPI<HttpMessageResponseDTO>>> UpdateRoles(string userId, AdminUpdateRolesDTO dTO)
         {
+            var respAPI = new ResponseAPI<HttpMessageResponseDTO>();
+
             try
             {
-                return Ok();
+                var results = await _adminRepo.UpdateRolesAsync(userId, dTO);
+
+                if (results.statusCode == 400)
+                {
+                    respAPI.StatusCode = System.Net.HttpStatusCode.BadRequest;
+                    respAPI.IsSuccess = false;
+                    respAPI.ErrorMessage = results.errMessage;
+                    return BadRequest(respAPI);
+                }
+                else if (results.statusCode == 404)
+                {
+                    respAPI.StatusCode = System.Net.HttpStatusCode.NotFound;
+                    respAPI.IsSuccess = false;
+                    respAPI.ErrorMessage = results.errMessage;
+                    return NotFound(respAPI);
+                }
+                else
+                {
+                    respAPI.Data = new HttpMessageResponseDTO { Message = $"Account id {userId} has been update to new roles" };
+                    return Ok(respAPI);
+                }
             }
             catch (Exception ex)
             {
-                return BadRequest();
+                respAPI.StatusCode = System.Net.HttpStatusCode.BadRequest;
+                respAPI.IsSuccess = false;
+                respAPI.ErrorMessage = new List<string> { ex.Message.ToString() };
+                return BadRequest(respAPI);
             }
         }
 
@@ -243,15 +295,40 @@ namespace DMNRestaurant.Controllers
          * @Access          Private(Admin Account)
          ***************************************************************************/
         [HttpDelete("{userId}/delete")]
-        public async Task<IActionResult> DeleteUser(string userId)
+        public async Task<ActionResult<ResponseAPI<HttpMessageResponseDTO>>> DeleteUser(string userId)
         {
+            var respAPI = new ResponseAPI<HttpMessageResponseDTO>();
+
             try
             {
-                return Ok();
+                var results = await _adminRepo.DeleteAsync(userId);
+
+                if (results.statusCode == 400)
+                {
+                    respAPI.StatusCode = System.Net.HttpStatusCode.BadRequest;
+                    respAPI.IsSuccess = false;
+                    respAPI.ErrorMessage = results.errMessage;
+                    return BadRequest(respAPI);
+                }
+                else if (results.statusCode == 404)
+                {
+                    respAPI.StatusCode = System.Net.HttpStatusCode.NotFound;
+                    respAPI.IsSuccess = false;
+                    respAPI.ErrorMessage = results.errMessage;
+                    return NotFound(respAPI);
+                }
+                else
+                {
+                    respAPI.Data = new HttpMessageResponseDTO { Message = "Account has been delete." };
+                    return Ok(respAPI);
+                }
             }
             catch (Exception ex)
             {
-                return BadRequest();
+                respAPI.StatusCode = System.Net.HttpStatusCode.BadRequest;
+                respAPI.IsSuccess = false;
+                respAPI.ErrorMessage = new List<string> { ex.Message.ToString() };
+                return BadRequest(respAPI);
             }
         }
     }

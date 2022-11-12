@@ -11,7 +11,6 @@ namespace DMNRestaurant.Services.Repository
 {
     public class AdminRepository : IAdminRepository
     {
-        private readonly ILogger<AdminRepository> logger;
         private readonly IMapper _mapper;
         private readonly UserManager<User> _userManager;
         private readonly SignInManager<User> _signInManager;
@@ -19,7 +18,6 @@ namespace DMNRestaurant.Services.Repository
         private readonly IPhotoRepository _photoRepository;
 
         public AdminRepository(
-                ILogger<AdminRepository> logger,
                 IMapper mapper,
                 UserManager<User> userManager,
                 SignInManager<User> signInManager,
@@ -27,7 +25,6 @@ namespace DMNRestaurant.Services.Repository
                 IPhotoRepository photoRepository
             )
         {
-            this.logger = logger;
             _mapper = mapper;
             _userManager = userManager;
             _signInManager = signInManager;
@@ -68,7 +65,7 @@ namespace DMNRestaurant.Services.Repository
          *                        Get a Single Account
          ***********************************************************************/
         public async Task<(int statusCode, List<string> errMessage, UserRolesDTO userRolesDTO)>
-            GetSingleUserAsync(string userId)
+            GetSingleUserAsync(string userId, string scheme, string host)
         {
             int statusCode = 200;
             var errMessage = new List<string>();
@@ -90,7 +87,7 @@ namespace DMNRestaurant.Services.Repository
             }
             else
             {
-                userRoles = GetSingleUserRoles(user, roles);
+                userRoles = GetSingleUserRoles(user, roles, scheme, host);
             }
 
             return (statusCode, errMessage, userRoles);
@@ -159,7 +156,7 @@ namespace DMNRestaurant.Services.Repository
         /************************************************************************
          *                        Update an Account
          ***********************************************************************/
-        public async Task<(int statusCode, List<string> errMessage)> UpdateAsync(string userId, UserUpdateDTO dto, IFormFile file)
+        public async Task<(int statusCode, List<string> errMessage)> UpdateAsync(string userId, UserUpdateDTO dto, IFormFile? file)
         {
             int statusCode = 200;
             var errMessage = new List<string>();
@@ -173,7 +170,7 @@ namespace DMNRestaurant.Services.Repository
             }
 
             // If user attached file for upload
-            if (_photoRepository.IsUpdaload(file))
+            if (file != null && file.Length > 0)
             {
                 var validResult = _photoRepository.Validation(file);
                 if (!String.IsNullOrEmpty(validResult))
@@ -212,10 +209,18 @@ namespace DMNRestaurant.Services.Repository
         /************************************************************************
          *                        Delete an Account
          ***********************************************************************/
-        public async Task<(int statusCode, List<string> errMessage)> DeleteAsync(User user)
+        public async Task<(int statusCode, List<string> errMessage)> DeleteAsync(string userId)
         {
             int statusCode = 200;
             var errMessage = new List<string>();
+
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                statusCode = 404;
+                errMessage.Add("Account not found.");
+                return (statusCode, errMessage);
+            }
 
             var result = await _userManager.DeleteAsync(user);
             if (!result.Succeeded)
@@ -286,7 +291,7 @@ namespace DMNRestaurant.Services.Repository
             foreach (var item in rolesToUpdate)
             {
                 var result = await _userManager.AddToRoleAsync(user, item);
-                if (result.Succeeded)
+                if (!result.Succeeded)
                 {
                     statusCode = 400;
                     errMessage.Add("Invalid edit role");
@@ -323,7 +328,12 @@ namespace DMNRestaurant.Services.Repository
         /************************************************************************
          *                   Get a Single User & Roles
          ***********************************************************************/
-        public UserRolesDTO GetSingleUserRoles(User user, IList<string> roles)
+        public UserRolesDTO GetSingleUserRoles(
+            User user,
+            IList<string> roles,
+            string scheme,
+            string host
+        )
         {
             return new UserRolesDTO
             {
@@ -331,7 +341,9 @@ namespace DMNRestaurant.Services.Repository
                 FullName = user.FullName,
                 UserName = user.UserName,
                 Email = user.Email,
-                Photo = user.Photo,
+                Photo = user.Photo == "nopic.png"
+                          ? user.Photo
+                          : $"{scheme}://{host}/images/accounts/{user.Photo}",
                 PhoneNumber = user.PhoneNumber,
                 Address = user.Address,
                 Roles = roles
