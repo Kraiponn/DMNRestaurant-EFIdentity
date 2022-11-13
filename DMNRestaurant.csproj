@@ -24,8 +24,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Data\" />
-    <Folder Include="Models\EntityConfig\" />
+    <Folder Include="Models\DTO\Cart\" />
+    <Folder Include="Models\DTO\Order\" />
     <Folder Include="wwwroot\images\products\" />
   </ItemGroup>
 
