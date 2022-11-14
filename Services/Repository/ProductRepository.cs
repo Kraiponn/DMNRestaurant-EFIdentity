@@ -53,7 +53,12 @@ namespace DMNRestaurant.Services.Repository
         /************************************************************************
          *                        Finding Many Products
          ***********************************************************************/
-        public Task<(int statusCode, List<string> errMessage, List<ProductWithPaginateDTO> results)> FindPrductsAsync(Expression<Func<Product, bool>>? filter, int page, int pageSize, bool tracked = true)
+        public Task<(int statusCode, List<string> errMessage, List<ProductWithPaginateDTO> results)>
+            FindPrductsAsync(
+                Expression<Func<Product, bool>>? filter,
+                int page,
+                int pageSize,
+                bool tracked = true)
         {
             throw new NotImplementedException();
         }

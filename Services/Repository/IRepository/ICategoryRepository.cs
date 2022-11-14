@@ -6,13 +6,14 @@ namespace DMNRestaurant.Services.Repository.IRepository
 {
     public interface ICategoryRepository
     {
-        Task<(int statusCode, List<string> errMessage, List<CategoryWithPaginateDTO> categories)> FindCategoriesAsync(
+        Task<(int statusCode, List<string> errMessage, CategoryWithPaginateDTO data)> FindCategoriesAsync(
                 Expression<Func<Category, bool>>? filter,
                 int page,
-                int pageSize,
-                bool tracked = true
+                int pageSize
             );
-        Task<(int statusCode, List<string> errMessage, CategoryDTO category)> FindCategoryByIdAsync(string catId);
+        Task<(int statusCode, List<string> errMessage, CategoryDTO category)> FindCategoryByIdAsync(
+                string catId,
+                bool tracked = true);
         Task<Category> CategoryExistAsync(string catId);
         Task<(int statusCode, List<string> errMessage)> CreateAsync(CategoryCUDTO dto);
         Task<(int statusCode, List<string> errMessage)> UpdateAsync(string catId, CategoryCUDTO dto);

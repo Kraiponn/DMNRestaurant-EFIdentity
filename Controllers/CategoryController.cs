@@ -1,8 +1,10 @@
-﻿using DMNRestaurant.Models.DTO;
+﻿using DMNRestaurant.Models;
+using DMNRestaurant.Models.DTO;
 using DMNRestaurant.Models.DTO.Category;
 using DMNRestaurant.Services;
 using DMNRestaurant.Services.Repository.IRepository;
 using Microsoft.AspNetCore.Mvc;
+using System.Linq.Expressions;
 
 namespace DMNRestaurant.Controllers
 {
@@ -19,17 +21,30 @@ namespace DMNRestaurant.Controllers
 
         /****************************************************************************
          * @Description     Get many categories
-         * @Route           GET api/category?skey=[]&page=[]&pageSize=[]
+         * @Route           GET api/category?skey=[string]&page=[Number]&pageSize=[Number]
          * @Access          Public
          ***************************************************************************/
         [HttpGet]
-        public ActionResult<List<ResponseAPI<CategoryDTO>>> GetCategories()
+        public async Task<ActionResult<CategoryWithPaginateDTO>> GetCategories(string? skey, int page = 1, int pageSize = 10)
         {
-            var respAPI = new ResponseAPI<List<CategoryDTO>>();
+            var respAPI = new ResponseAPI<CategoryWithPaginateDTO>();
 
             try
             {
-                //
+                Expression<Func<Category, bool>>? filter = skey != null
+                                                            ? (p => p.Name.Contains(skey))
+                                                            : null;
+
+                var results = await _dbService.FindCategoriesAsync(filter, page, pageSize);
+                if (results.statusCode == 404)
+                {
+                    respAPI.StatusCode = System.Net.HttpStatusCode.NotFound;
+                    respAPI.IsSuccess = false;
+                    respAPI.ErrorMessage = results.errMessage;
+                    return NotFound(respAPI);
+                }
+
+                respAPI.Data = results.data;
                 return Ok(respAPI);
             }
             catch (Exception ex)
@@ -47,13 +62,23 @@ namespace DMNRestaurant.Controllers
          * @Access          Public
          ***************************************************************************/
         [HttpGet("{catId}")]
-        public ActionResult<ResponseAPI<CategoryDTO>> GetCategoryById(string catId)
+        public async Task<ActionResult<ResponseAPI<CategoryDTO>>> GetCategoryById(string catId)
         {
             var respAPI = new ResponseAPI<CategoryDTO>();
 
             try
             {
-                //
+                var results = await _dbService.FindCategoryByIdAsync(catId, true);
+
+                if (results.statusCode == 404)
+                {
+                    respAPI.StatusCode = System.Net.HttpStatusCode.NotFound;
+                    respAPI.IsSuccess = false;
+                    respAPI.ErrorMessage = results.errMessage;
+                    return NotFound(respAPI);
+                }
+
+                respAPI.Data = results.category;
                 return Ok(respAPI);
             }
             catch (Exception ex)
@@ -71,14 +96,25 @@ namespace DMNRestaurant.Controllers
          * @Access          Private - Admin Account
          ***************************************************************************/
         [HttpPost]
-        public ActionResult<ResponseAPI<HttpMessageResponseDTO>> CreateCategory(CategoryCUDTO dto)
+        public async Task<ActionResult<ResponseAPI<HttpMessageResponseDTO>>> CreateCategory(CategoryCUDTO dto)
         {
             var respAPI = new ResponseAPI<HttpMessageResponseDTO>();
 
             try
             {
-                //
-                return Ok(respAPI);
+                var results = await _dbService.CreateAsync(dto);
+
+                if (results.statusCode != 201)
+                {
+                    respAPI.StatusCode = System.Net.HttpStatusCode.BadRequest;
+                    respAPI.IsSuccess = false;
+                    respAPI.ErrorMessage = results.errMessage;
+                    return BadRequest(respAPI);
+                }
+
+                respAPI.Data = new HttpMessageResponseDTO { Message = "Category created successfully" };
+                return Created("CreatedCategory", respAPI);
+
             }
             catch (Exception ex)
             {
@@ -95,14 +131,33 @@ namespace DMNRestaurant.Controllers
          * @Access          Private - Admin Account
          ***************************************************************************/
         [HttpPut("{catId}")]
-        public ActionResult<ResponseAPI<HttpMessageResponseDTO>> UpdateCategory(string catId, CategoryCUDTO dto)
+        public async Task<ActionResult<ResponseAPI<HttpMessageResponseDTO>>> UpdateCategory(string catId, CategoryCUDTO dto)
         {
             var respAPI = new ResponseAPI<HttpMessageResponseDTO>();
 
             try
             {
-                //
-                return Ok(respAPI);
+                var results = await _dbService.UpdateAsync(catId, dto);
+
+                if (results.statusCode == 400)
+                {
+                    respAPI.StatusCode = System.Net.HttpStatusCode.BadRequest;
+                    respAPI.IsSuccess = false;
+                    respAPI.ErrorMessage = results.errMessage;
+                    return BadRequest(respAPI);
+                }
+                else if (results.statusCode == 404)
+                {
+                    respAPI.StatusCode = System.Net.HttpStatusCode.NotFound;
+                    respAPI.IsSuccess = false;
+                    respAPI.ErrorMessage = results.errMessage;
+                    return NotFound(respAPI);
+                }
+                else
+                {
+                    respAPI.Data = new HttpMessageResponseDTO { Message = "Category updated successfully" };
+                    return Ok(respAPI);
+                }
             }
             catch (Exception ex)
             {
@@ -119,14 +174,34 @@ namespace DMNRestaurant.Controllers
          * @Access          Private - Admin Account
          ***************************************************************************/
         [HttpDelete("{catId}")]
-        public ActionResult<ResponseAPI<HttpMessageResponseDTO>> DeleteCategory(string catId)
+        public async Task<ActionResult<ResponseAPI<HttpMessageResponseDTO>>> DeleteCategory(string catId)
         {
             var respAPI = new ResponseAPI<HttpMessageResponseDTO>();
 
             try
             {
-                //
-                return Ok(respAPI);
+                var results = await _dbService.DeleteAsync(catId);
+
+                if (results.statusCode == 400)
+                {
+                    respAPI.StatusCode = System.Net.HttpStatusCode.BadRequest;
+                    respAPI.IsSuccess = false;
+                    respAPI.ErrorMessage = results.errMessage;
+                    return BadRequest(respAPI);
+                }
+                else if (results.statusCode == 404)
+                {
+                    respAPI.StatusCode = System.Net.HttpStatusCode.NotFound;
+                    respAPI.IsSuccess = false;
+                    respAPI.ErrorMessage = results.errMessage;
+                    return NotFound(respAPI);
+                }
+                else
+                {
+                    respAPI.Data = new HttpMessageResponseDTO { Message = "Category deleted successfully" };
+                    return Ok(respAPI);
+                }
+
             }
             catch (Exception ex)
             {
